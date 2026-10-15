@@ -131,3 +131,20 @@ Item = TypeVar("Item")
 class PublishResponse(StrictModel, Generic[Item]):
     item: Item
     push: PushStatus
+
+
+Topic = Literal["deals", "picks", "airdrops", "tips"]
+
+
+class SubscribeRequest(StrictModel):
+    token: Annotated[str, StringConstraints(strict=True, strip_whitespace=True, min_length=1)]
+    topics: list[Topic] = Field(default_factory=lambda: ["deals", "picks", "airdrops", "tips"])
+
+    @field_validator("topics")
+    @classmethod
+    def unique_topics(cls, value):
+        return list(dict.fromkeys(value))
+
+
+class SubscribeResponse(StrictModel):
+    subscribed: list[Topic]

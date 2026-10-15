@@ -32,6 +32,13 @@ class Sender(Protocol):
     def send(self, row: PushOutbox) -> None: ...
 
 
+class TopicSubscriptionError(Exception):
+    def __init__(self, subscribed: list[str], failed: list[str]):
+        super().__init__("Could not subscribe to all requested topics")
+        self.subscribed = subscribed
+        self.failed = failed
+
+
 class FirebaseSender:
     def __init__(self, settings: Settings):
         try:
@@ -58,6 +65,24 @@ class FirebaseSender:
             },
         )
         messaging.send(message, app=self.app)
+
+    def subscribe(self, token: str, topics: list[str]) -> list[str]:
+        subscribed, failed = [], []
+        for topic in topics:
+            try:
+                result = messaging.subscribe_to_topic([token], topic, app=self.app)
+            except Exception as exc:
+                # SDK errors can include registration tokens. Log only the type.
+                logger.warning("Topic subscription failed for %s (%s)", topic, type(exc).__name__)
+                failed.append(topic)
+                continue
+            if result.success_count == 1 and result.failure_count == 0:
+                subscribed.append(topic)
+            else:
+                failed.append(topic)
+        if failed:
+            raise TopicSubscriptionError(subscribed, failed)
+        return subscribed
 
     def close(self):
         firebase_admin.delete_app(self.app)

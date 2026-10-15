@@ -57,6 +57,7 @@ Render's free service can spin down while idle, so background retries run only w
 
 - `GET /health`: executes `SELECT 1`; returns `{"status":"ok"}` on success or 503 if the database is unavailable.
 - `GET /api/deals`, `/api/picks`, `/api/airdrops`, `/api/tips`: public JSON arrays containing all item fields, including integer `id` and UTC `created_at`. Offers sort by `created_at DESC, id DESC`; picks/tips by `date DESC, created_at DESC, id DESC`.
+- `POST /api/push/subscribe`: public device topic subscription, described below.
 - `POST` on each feed: send `X-Publish-Token`. A successful save returns HTTP 201 with `{"item": {...}, "push": "sent" | "queued" | "not_configured"}`. Invalid/missing tokens return 401. Invalid content returns 422. Tokens use a constant-time comparison.
 - Duplicate publishing returns 409 and creates neither another outbox row nor another immediate push. Picks/tips enforce exact `(title, url, date)` uniqueness, allowing multiple different items on a date. Deals enforce unique `url` as requested. Airdrops have no date, so exact duplicate identity is `(title, url)`. Uniqueness is per feed and enforced by database constraints, including concurrent requests.
 - `DELETE /api/{feed}/{id}`: token required; 204 with an empty body on success, 404 for an absent positive ID. Unsent outbox entries for the deleted item are removed in the same transaction. An already accepted or in-flight FCM push cannot be recalled.
@@ -100,6 +101,20 @@ Repeating one of these unchanged commands returns 409. Example deletion (replace
 curl --fail-with-body -i -X DELETE "$API_BASE/api/deals/1" \
   -H "X-Publish-Token: $PUBLISH_TOKEN"
 ```
+
+## Subscribe a device to push topics
+
+Send the device's FCM registration token to this public endpoint; no `X-Publish-Token` is required:
+
+```bash
+curl --fail-with-body -X POST "$API_BASE/api/push/subscribe" \
+  -H 'Content-Type: application/json' \
+  --data '{"token":"YOUR_FCM_REGISTRATION_TOKEN"}'
+```
+
+Omitting `topics` subscribes to all four feeds and returns HTTP 200 with `{"subscribed":["deals","picks","airdrops","tips"]}`. To choose feeds, send `{"token":"YOUR_FCM_REGISTRATION_TOKEN","topics":["deals","tips"]}`. Only the four feed names are accepted. Repeated topics are subscribed once, in request order. An explicit empty topics array returns `{"subscribed":[]}` without SDK calls.
+
+The token must be a nonempty string; blank tokens, unknown fields, invalid topics, and null topics return 422. The endpoint uses the existing Firebase app and Python Admin SDK's [`subscribe_to_topic`](https://firebase.google.com/docs/reference/admin/python/firebase_admin.messaging#subscribe_to_topic) for each topic. It returns 503 when Firebase credentials are absent. If Firebase rejects or fails a subscription, it returns 502 with `detail.subscribed` listing confirmed successes and `detail.failed` listing failed topics; a partial result is never reported as full success. Registration tokens and raw provider errors are not logged or persisted by this endpoint.
 
 ## Push delivery and operations
 

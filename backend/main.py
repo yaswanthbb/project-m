@@ -13,8 +13,16 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from config import Settings
 from database import make_engine, session_factory
 from models import Airdrop, Deal, Pick, PushOutbox, Tip
-from push import Dispatcher, FirebaseSender
-from schemas import ArticleCreate, ArticleRead, OfferCreate, OfferRead, PublishResponse
+from push import Dispatcher, FirebaseSender, TopicSubscriptionError
+from schemas import (
+    ArticleCreate,
+    ArticleRead,
+    OfferCreate,
+    OfferRead,
+    PublishResponse,
+    SubscribeRequest,
+    SubscribeResponse,
+)
 
 logger = logging.getLogger(__name__)
 _DEFAULT_SENDER = object()
@@ -51,6 +59,7 @@ def create_app(
                 if config.firebase_json or config.firebase_base64:
                     firebase = FirebaseSender(config)
                     actual_sender = firebase
+            app.state.push_client = actual_sender
             app.state.settings = config
             app.state.engine = engine
             app.state.sessions = session_factory(engine)
@@ -77,6 +86,24 @@ def create_app(
         except SQLAlchemyError:
             raise HTTPException(status_code=503, detail="Database unavailable") from None
         return {"status": "ok"}
+
+    @app.post("/api/push/subscribe", response_model=SubscribeResponse)
+    def subscribe(payload: SubscribeRequest, request: Request):
+        push_client = request.app.state.push_client
+        if push_client is None:
+            raise HTTPException(status_code=503, detail="Firebase is not configured")
+        try:
+            subscribed = push_client.subscribe(payload.token, payload.topics)
+        except TopicSubscriptionError as exc:
+            raise HTTPException(
+                status_code=502,
+                detail={
+                    "message": str(exc),
+                    "subscribed": exc.subscribed,
+                    "failed": exc.failed,
+                },
+            ) from None
+        return {"subscribed": subscribed}
 
     def register_feed(topic, model, create_schema, read_schema):
         def list_items(request: Request):
