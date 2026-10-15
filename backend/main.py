@@ -7,10 +7,11 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Path, Request, Response, status
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import delete, select, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from config import Settings
+from config import Settings, frontend_origins
 from database import make_engine, session_factory
 from models import Airdrop, Deal, Pick, PushOutbox, Tip
 from push import Dispatcher, FirebaseSender, TopicSubscriptionError
@@ -77,6 +78,14 @@ def create_app(
             engine.dispose()
 
     app = FastAPI(title="Personal News API", version="1.0.0", lifespan=lifespan)
+    # Public feeds and header-authenticated writes; no cookie credentials.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=frontend_origins(),
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "DELETE"],
+        allow_headers=["Content-Type", "X-Publish-Token"],
+    )
 
     @app.get("/health")
     def health(request: Request):

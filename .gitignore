@@ -7,3 +7,12 @@ __pycache__/
 *.db
 .coverage
 .pg-test/
+
+# Static frontend
+node_modules/
+frontend/dist/
+frontend/.env.local
+frontend/.env.*.local
+*.tsbuildinfo
+frontend/test-results/
+frontend/playwright-report/

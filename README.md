@@ -147,3 +147,9 @@ TEST_DATABASE_URL='postgresql://USER:PASSWORD@localhost/news_api_test' pytest -q
 ```
 
 **The test suite deletes all rows and performs migration downgrade/upgrade round trips in `TEST_DATABASE_URL`. Never point it at production.** The suite covers every feed, authentication, validation, duplicate prevention, transaction rollback, queued/retried sends, SDK payloads, schema/model drift, migration guards, and restart recovery. Firebase sends are mocked; a real service-account/device smoke test must be run separately.
+
+## React PWA frontend
+
+The installable **Daily Drop** client lives in [`frontend/`](frontend/README.md). It uses React, Vite, Tailwind, a bundled offline/FCM service worker, and the deployed public API. Run `cd frontend && npm ci && npm run dev`; build with `npm run build` and host `frontend/dist` as a static HTTPS site. Firebase client variables are documented in `frontend/.env.example` and can be supplied later.
+
+The browser client requires the included CORS middleware to be deployed with the backend. Set optional `FRONTEND_ORIGINS` to comma-separated frontend origins to restrict browser access; the default `*` permits public cross-origin clients without cookie credentials. This does not change token authentication. See the frontend README for push setup, static hosting, and verification boundaries.

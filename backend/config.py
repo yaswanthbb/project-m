@@ -44,3 +44,10 @@ class Settings:
             firebase_json=os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON") or None,
             firebase_base64=os.environ.get("FIREBASE_SERVICE_ACCOUNT_BASE64") or None,
         )
+
+
+def frontend_origins() -> list[str]:
+    """Comma-separated static-site origins; public cross-origin access by default."""
+    load_environment()
+    raw = os.environ.get("FRONTEND_ORIGINS", "*")
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
