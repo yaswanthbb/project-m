@@ -163,8 +163,10 @@ TEST_DATABASE_URL='postgresql://USER:PASSWORD@localhost/news_api_test' pytest -q
 
 **The test suite deletes all rows and performs migration downgrade/upgrade round trips in `TEST_DATABASE_URL`. Never point it at production.** The suite covers every feed, authentication, validation, duplicate prevention, transaction rollback, queued/retried sends, SDK payloads, schema/model drift, migration guards, and restart recovery. Firebase sends are mocked; a real service-account/device smoke test must be run separately.
 
-## React PWA frontend
+## Android app · Daily Drop
 
-The installable **Daily Drop** client lives in [`frontend/`](frontend/README.md). It uses React, Vite, Tailwind, a bundled offline/FCM service worker, and the deployed public API. Run `cd frontend && npm ci && npm run dev`; build with `npm run build` and host `frontend/dist` as a static HTTPS site. Firebase client variables are documented in `frontend/.env.example` and can be supplied later.
+The native **React Native + Expo** client is in [`mobile/`](mobile/README.md), replacing the previous web frontend. It preserves the light green/cream design, three bottom destinations, four feeds, detail and claim screens, confirmation dialogs, native pull-to-refresh, offline snapshots, secure publish-token storage, and notification deep links.
 
-The browser client requires the included CORS middleware to be deployed with the backend. Set optional `FRONTEND_ORIGINS` to comma-separated frontend origins to restrict browser access; the default `*` permits public cross-origin clients without cookie credentials. This does not change token authentication. See the frontend README for push setup, static hosting, and verification boundaries.
+Run `cd mobile && npm ci && npm run preview:phone` to inspect the UI with a matching Expo Go app. Native Firebase messaging requires the real Android `google-services.json` and an Android development/release build. Use `npm run android` with a local Android toolchain or the documented user-run EAS `preview` profile to build an APK. No APK or real device delivery is claimed from JavaScript bundle checks.
+
+See the mobile README for Firebase setup, app updates, APK build commands, and verification boundaries. The existing backend and subscription endpoint are retained. Native clients still need the backend Firebase IAM permissions described above; moving from the browser to Android does not bypass provider authorization.

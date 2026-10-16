@@ -1,0 +1,68 @@
+import { StyleSheet } from "react-native";
+export const colors = {
+  paper: "#fafbf8",
+  white: "#ffffff",
+  ink: "#263d2f",
+  green: "#17824f",
+  greenDeep: "#105d3a",
+  muted: "#748267",
+  faint: "#9aa78f",
+  line: "#e5ebde",
+  mint: "#eaf2df",
+  mintInk: "#547c3f",
+  purple: "#f0eafa",
+  purpleInk: "#9270b3",
+  blue: "#e8effa",
+  blueInk: "#5e84b9",
+  peach: "#fff0e5",
+  peachInk: "#c68a5a",
+  yellow: "#fbf1d5",
+  yellowInk: "#a48a48",
+};
+export const fonts = {
+  regular: "DMSans_400Regular",
+  medium: "DMSans_500Medium",
+  semi: "DMSans_600SemiBold",
+  bold: "DMSans_700Bold",
+  extra: "DMSans_800ExtraBold",
+};
+export const shared = StyleSheet.create({
+  page: { flex: 1, backgroundColor: colors.paper },
+  content: {
+    paddingHorizontal: 22,
+    paddingTop: 27,
+    paddingBottom: 30,
+    width: "100%",
+    maxWidth: 680,
+    alignSelf: "center",
+  },
+  eyebrow: {
+    color: colors.faint,
+    fontFamily: fonts.bold,
+    fontSize: 9,
+    letterSpacing: 1.5,
+  },
+  title: {
+    fontFamily: fonts.bold,
+    color: colors.ink,
+    fontSize: 29,
+    letterSpacing: -1,
+    lineHeight: 38,
+  },
+  body: {
+    fontFamily: fonts.regular,
+    color: colors.muted,
+    fontSize: 14,
+    lineHeight: 24,
+  },
+  card: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 19,
+    padding: 22,
+    boxShadow: "0px 4px 14px rgba(35, 58, 24, 0.025)",
+  },
+  row: { flexDirection: "row", alignItems: "center" },
+  divider: { height: 1, backgroundColor: colors.line },
+});

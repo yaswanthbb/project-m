@@ -8,11 +8,17 @@ __pycache__/
 .coverage
 .pg-test/
 
-# Static frontend
+# App dependencies and generated outputs
 node_modules/
-frontend/dist/
-frontend/.env.local
-frontend/.env.*.local
 *.tsbuildinfo
-frontend/test-results/
-frontend/playwright-report/
+mobile/.expo/
+mobile/android/
+mobile/ios/
+mobile/dist/
+mobile/artifacts/
+mobile/test-results/
+mobile/playwright-report/
+mobile/.env.*
+!mobile/.env.example
+mobile/firebase/*.json
+mobile/firebase/*.plist
