@@ -1,7 +1,7 @@
 from unittest.mock import Mock, call
 
 import pytest
-from firebase_admin import messaging
+from firebase_admin import exceptions, messaging
 
 from push import FirebaseSender
 
@@ -101,9 +101,48 @@ def test_subscription_failure_reports_only_confirmed_topics(subscription, caplog
             "message": "Could not subscribe to all requested topics",
             "subscribed": ["deals", "tips"],
             "failed": ["picks"],
+            "errors": {"picks": "UNKNOWN_ERROR" if raise_error else "INVALID_ARGUMENT"},
         }
     }
     assert sdk.call_args_list == [
         call([secret], topic, app=firebase_app) for topic in ["deals", "picks", "tips"]
     ]
     assert secret not in response.text and secret not in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("provider_reason", "safe_code"),
+    [
+        ("PERMISSION_DENIED", "PERMISSION_DENIED"),
+        ("SENDER_ID_MISMATCH", "SENDER_ID_MISMATCH"),
+        ("UNREGISTERED", "UNREGISTERED"),
+        ("messaging/mismatched-credential", "MISMATCHED_CREDENTIAL"),
+        ("provider error containing private-registration-token", "UNKNOWN_ERROR"),
+    ],
+)
+def test_returned_provider_failures_have_safe_diagnostics(
+    subscription, caplog, provider_reason, safe_code
+):
+    client, sdk, _ = subscription
+    sdk.return_value = messaging.TopicManagementResponse({"results": [{"error": provider_reason}]})
+    response = client.post(
+        "/api/push/subscribe",
+        json={"token": "private-registration-token", "topics": ["deals"]},
+    )
+    assert response.status_code == 502
+    assert response.json()["detail"]["errors"] == {"deals": safe_code}
+    assert f"Topic subscription failed for deals (reason={safe_code})" in caplog.text
+    assert "private-registration-token" not in response.text + caplog.text
+
+
+def test_raised_provider_failures_have_safe_diagnostics(subscription, caplog):
+    client, sdk, _ = subscription
+    sdk.side_effect = exceptions.PermissionDeniedError("private-registration-token")
+    response = client.post(
+        "/api/push/subscribe",
+        json={"token": "private-registration-token", "topics": ["tips"]},
+    )
+    assert response.status_code == 502
+    assert response.json()["detail"]["errors"] == {"tips": "PERMISSION_DENIED"}
+    assert "reason=PERMISSION_DENIED" in caplog.text
+    assert "private-registration-token" not in response.text + caplog.text

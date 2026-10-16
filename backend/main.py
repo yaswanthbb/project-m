@@ -110,6 +110,7 @@ def create_app(
                     "message": str(exc),
                     "subscribed": exc.subscribed,
                     "failed": exc.failed,
+                    "errors": exc.errors,
                 },
             ) from None
         return {"subscribed": subscribed}

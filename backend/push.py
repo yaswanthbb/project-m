@@ -32,11 +32,48 @@ class Sender(Protocol):
     def send(self, row: PushOutbox) -> None: ...
 
 
+# Firebase may include the registration token or request URL in raw errors.
+# Only documented, fixed identifiers may reach logs or public responses.
+_SUBSCRIPTION_ERROR_CODES = frozenset(
+    {
+        "INVALID_ARGUMENT",
+        "UNAUTHENTICATED",
+        "PERMISSION_DENIED",
+        "NOT_FOUND",
+        "UNREGISTERED",
+        "SENDER_ID_MISMATCH",
+        "RESOURCE_EXHAUSTED",
+        "QUOTA_EXCEEDED",
+        "TOO_MANY_TOPICS",
+        "TOO_MANY_REGISTRATIONS",
+        "INTERNAL",
+        "INTERNAL_ERROR",
+        "UNAVAILABLE",
+        "DEADLINE_EXCEEDED",
+        "UNKNOWN_ERROR",
+        "INVALID_REGISTRATION",
+        "INVALID_REGISTRATION_TOKEN",
+        "REGISTRATION_TOKEN_NOT_REGISTERED",
+        "AUTHENTICATION_ERROR",
+        "MISMATCHED_CREDENTIAL",
+        "SERVER_UNAVAILABLE",
+    }
+)
+
+
+def subscription_error_code(reason) -> str:
+    if not isinstance(reason, str):
+        return "UNKNOWN_ERROR"
+    code = reason.removeprefix("messaging/").replace("-", "_").upper()
+    return code if code in _SUBSCRIPTION_ERROR_CODES else "UNKNOWN_ERROR"
+
+
 class TopicSubscriptionError(Exception):
-    def __init__(self, subscribed: list[str], failed: list[str]):
+    def __init__(self, subscribed: list[str], failed: list[str], errors: dict[str, str]):
         super().__init__("Could not subscribe to all requested topics")
         self.subscribed = subscribed
         self.failed = failed
+        self.errors = errors
 
 
 class FirebaseSender:
@@ -67,21 +104,28 @@ class FirebaseSender:
         messaging.send(message, app=self.app)
 
     def subscribe(self, token: str, topics: list[str]) -> list[str]:
-        subscribed, failed = [], []
+        subscribed, failed, errors = [], [], {}
         for topic in topics:
             try:
                 result = messaging.subscribe_to_topic([token], topic, app=self.app)
             except Exception as exc:
-                # SDK errors can include registration tokens. Log only the type.
-                logger.warning("Topic subscription failed for %s (%s)", topic, type(exc).__name__)
+                code = subscription_error_code(getattr(exc, "code", None))
+                logger.warning("Topic subscription failed for %s (reason=%s)", topic, code)
                 failed.append(topic)
+                errors[topic] = code
                 continue
             if result.success_count == 1 and result.failure_count == 0:
                 subscribed.append(topic)
             else:
+                # The SDK often returns failures rather than raising an exception.
+                # Previously this branch discarded the only useful diagnostic.
+                reason = result.errors[0].reason if result.errors else None
+                code = subscription_error_code(reason)
+                logger.warning("Topic subscription failed for %s (reason=%s)", topic, code)
                 failed.append(topic)
+                errors[topic] = code
         if failed:
-            raise TopicSubscriptionError(subscribed, failed)
+            raise TopicSubscriptionError(subscribed, failed, errors)
         return subscribed
 
     def close(self):

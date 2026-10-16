@@ -114,7 +114,22 @@ curl --fail-with-body -X POST "$API_BASE/api/push/subscribe" \
 
 Omitting `topics` subscribes to all four feeds and returns HTTP 200 with `{"subscribed":["deals","picks","airdrops","tips"]}`. To choose feeds, send `{"token":"YOUR_FCM_REGISTRATION_TOKEN","topics":["deals","tips"]}`. Only the four feed names are accepted. Repeated topics are subscribed once, in request order. An explicit empty topics array returns `{"subscribed":[]}` without SDK calls.
 
-The token must be a nonempty string; blank tokens, unknown fields, invalid topics, and null topics return 422. The endpoint uses the existing Firebase app and Python Admin SDK's [`subscribe_to_topic`](https://firebase.google.com/docs/reference/admin/python/firebase_admin.messaging#subscribe_to_topic) for each topic. It returns 503 when Firebase credentials are absent. If Firebase rejects or fails a subscription, it returns 502 with `detail.subscribed` listing confirmed successes and `detail.failed` listing failed topics; a partial result is never reported as full success. Registration tokens and raw provider errors are not logged or persisted by this endpoint.
+The token must be a nonempty string; blank tokens, unknown fields, invalid topics, and null topics return 422. The endpoint uses the existing Firebase app and Python Admin SDK's [`subscribe_to_topic`](https://firebase.google.com/docs/reference/admin/python/firebase_admin.messaging#subscribe_to_topic) for each topic. It returns 503 when Firebase credentials are absent. If Firebase rejects or fails a subscription, it returns 502 with `detail.subscribed` listing confirmed successes, `detail.failed` listing failed topics, and `detail.errors` mapping each failed topic to an allowlisted Firebase error code; a partial result is never reported as full success. Registration tokens and raw provider errors are not logged or persisted by this endpoint.
+
+### Diagnose subscription HTTP 502
+
+A successful `OPTIONS` preflight followed by `POST /api/push/subscribe` HTTP 502 means the API could not complete the Firebase subscription. It does not identify the underlying Firebase cause by itself. Missing Firebase configuration returns 503 instead.
+
+Each failed topic now emits a safe warning such as `Topic subscription failed for deals (reason=PERMISSION_DENIED)`. This covers both raised SDK exceptions and per-token failures returned by `subscribe_to_topic`. The response also includes `detail.errors`, while preserving the confirmed/failed topic lists. Raw provider text, tokens, credential contents, and request URLs are never included; unrecognized reasons become `UNKNOWN_ERROR`.
+
+- `PERMISSION_DENIED` or `UNAUTHENTICATED`: verify the service account configured on Render can use Firebase Cloud Messaging in the target project. The pinned Admin SDK uses the FCM v1 topic API, which needs `cloudmessaging.topicSubscriptions.create` as well as `cloudmessaging.messages.create` for publishing. The Firebase Cloud Messaging API Admin role (`roles/firebasecloudmessaging.admin`) includes these permissions. Verify that the Firebase Cloud Messaging API is enabled.
+- `SENDER_ID_MISMATCH` or `MISMATCHED_CREDENTIAL`: verify the deployed frontend's Firebase config/VAPID key and Render's service account belong to the intended Firebase project; rebuild the frontend after correcting build-time variables.
+- `UNREGISTERED`, `INVALID_REGISTRATION`, or `REGISTRATION_TOKEN_NOT_REGISTERED`: the device registration is stale or invalid; obtain a fresh FCM registration for that device after correcting any configuration mismatch.
+- `RESOURCE_EXHAUSTED`, `QUOTA_EXCEEDED`, `UNAVAILABLE`, or `INTERNAL`: check the corresponding Firebase quota/status and retry later.
+
+Use the actual reason to choose a fix. Access-log status codes alone cannot establish a project mismatch, missing permission, invalid registration, or provider outage. Local credentials can differ from the credentials deployed on Render.
+
+References: [Firebase error codes](https://firebase.google.com/docs/cloud-messaging/error-codes), [Cloud Messaging IAM roles and permissions](https://docs.cloud.google.com/iam/docs/roles-permissions/firebasecloudmessaging).
 
 ## Push delivery and operations
 
